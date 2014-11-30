@@ -1,0 +1,79 @@
+#!/bin/bash
+fname=names.dat
+[ ! -f $fname ] && > $fname
+
+while true     # This is for loop
+do
+clear
+# The following code will display the Menu
+echo -e "\n\t\t SHELL PROGRAMMING DATABASE"
+echo -e "\t 1.Press 1 to create a record"
+echo -e "\t 2.Press 2 to View records"
+echo -e "\t 3.Press 3 to Search records"
+echo -e "\t 4.Press 4 to delete a record"
+echo -e "Answer (or 'q' to quit)?  \c"
+read opt junk
+
+[ "$opt" = "" ] && continue
+
+case $opt in 
+		1)
+                 echo 'Please enter your name: '
+			read name
+			echo
+		echo 'Please enter your Surname: '
+			read sname
+			echo
+		echo 'Please enter your address: '
+			read address
+			echo
+		echo 'Please enter your Phone Number: '
+			read phone
+			echo
+		echo 'Please enter your Zip Code: '
+			read zcode
+			echo
+		echo "$name : $sname : $address : $phone : $zcode" >> $fname
+			;;
+		2)
+		echo Content of the file is: 
+		cat -n $fname
+		;;
+		3)
+		echo -e "Please enter the text that you want to search \n"
+		read search
+		grep $search $fname
+		;;
+		4)
+		cat -n $fname 
+		echo -e "Please enter the record that you want to delete \n"
+		read record
+		sed /$record/d $fname > newfname
+		echo "The updated record will be:"
+		cat newfname
+		echo "Are you sure you want to delete"
+		read var1
+			if  $var1 == y || yes || YES || Yes 
+				then 
+					mv newfname $fname 
+					echo "Record deleted"
+					cat -n $fname
+			elif  $var1 == n || no || NO || No 
+				then 
+				cat newfname
+				else
+				echo "Enter the valid option"
+			fi
+		;;
+		q*|Q*)
+		exit 0
+		;;
+		*)
+		echo -e  "This is not a valid option"
+		;;
+esac
+
+echo -e "Hit <ENTER> to continue"
+read junk
+clear
+done

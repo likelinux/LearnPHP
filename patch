@@ -1,0 +1,205 @@
+commit e1dda24b408e537881456faf0765ec9524567ea7
+Author: Pankaj Garg <pankaj.garg@kayako.com>
+Date:   Wed May 29 11:49:29 2013 +0530
+
+    SWIFT-1683, In case of multiple email addresses for user account, there should be an option under User account to be enabled for sending ticket updates to all the email addresses
+    {nb}
+
+diff --git a/trunk/__apps/tickets/models/Ticket/class.SWIFT_Ticket.php b/trunk/__apps/tickets/models/Ticket/class.SWIFT_Ticket.php
+index 308854c..d310f06 100755
+--- a/trunk/__apps/tickets/models/Ticket/class.SWIFT_Ticket.php
++++ b/trunk/__apps/tickets/models/Ticket/class.SWIFT_Ticket.php
+@@ -1911,7 +1911,7 @@ class SWIFT_Ticket extends SWIFT_Model
+ 		if ($this->GetProperty('duetime') == '0') {
+ 			return true;
+ 		}
+-		
++
+ 		// Create Audit Log
+ 		SWIFT_TicketAuditLog::AddToLog($this, null, SWIFT_TicketAuditLog::ACTION_UPDATETICKET,
+ 			$_SWIFT->Language->Get('al_duestaffclear'),
+@@ -4740,6 +4740,18 @@ class SWIFT_Ticket extends SWIFT_Model
+ 
+ 		$_SWIFT_UserObject = $this->GetUserObject();
+ 
++		/*
++		 * BUG FIX - Pankaj Garg
++		 *
++		 * SWIFT-1683, In case of multiple email addresses for user account, there should be an option under User account to be enabled for sending ticket updates to all the email addresses
++		 *
++		 * Comments:We dispatch the auto responder and staff replies to ALL registered emails of the user whose option - 'Send Ticket update to all the email addresses' is set to true
++		 */
++		$_userSettingContainer = SWIFT_UserSetting::RetrieveOnUser($_SWIFT_UserObject);
++		if (isset($_userSettingContainer['sendemailtoall']) && $_userSettingContainer['sendemailtoall'] == 0) {
++			return false;
++		}
++
+ 		$_ccEmailList = array();
+ 		if ($_SWIFT_UserObject instanceof SWIFT_User && $_SWIFT_UserObject->GetIsClassLoaded())
+ 		{
+diff --git a/trunk/__swift/apps/base/client/class.Controller_UserAccount.php b/trunk/__swift/apps/base/client/class.Controller_UserAccount.php
+index ffc36a4..a7d377e 100755
+--- a/trunk/__swift/apps/base/client/class.Controller_UserAccount.php
++++ b/trunk/__swift/apps/base/client/class.Controller_UserAccount.php
+@@ -149,6 +149,24 @@ class Controller_UserAccount extends Controller_client
+ 			$this->Template->Assign('_userPhone', htmlspecialchars($_POST['phone']));
+ 		}
+ 
++		/*
++		 * BUG FIX - Pankaj Garg
++		 *
++		 * SWIFT-1683, In case of multiple email addresses for user account, there should be an option under User account to be enabled for sending ticket updates to all the email addresses
++		 *
++		 */
++		if (!isset($_POST['sendemailtoall'])) {
++			$_userSettingContainer  = SWIFT_UserSetting::RetrieveOnUser($_SWIFT->User);
++			$_sendMailToAll = 1;
++			if (isset($_userSettingContainer['sendemailtoall'])) {
++				$_sendMailToAll = $_userSettingContainer['sendemailtoall'];
++			}
++
++			$this->Template->Assign('_sendEmailToAll', $_sendMailToAll);
++		} else {
++			$this->Template->Assign('_sendEmailToAll', intval($_POST['sendemailtoall']));
++		}
++
+ 		// Organization Update Settings
+ 		$_SWIFT_UserOrganizationObject = false;
+ 		if ($_SWIFT->User->GetProperty('userorganizationid') != '0')
+@@ -416,6 +434,15 @@ class Controller_UserAccount extends Controller_client
+ 		// Time to update the profile
+ 		$_SWIFT->User->UpdateProfile($_POST['salutation'], $_POST['fullname'], $_POST['userdesignation'], $_POST['phone']);
+ 
++		/*
++		 * BUG FIX - Pankaj Garg
++		 *
++		 * SWIFT-1683, In case of multiple email addresses for user account, there should be an option under User account to be enabled for sending ticket updates to all the email addresses
++		 */
++		if (isset($_POST['sendemailtoall'])) {
++			SWIFT_UserSetting::Replace($_SWIFT->User->GetID(), 'sendemailtoall', $_POST['sendemailtoall']);
++		}
++
+ 		// Any profile image?
+ 		$this->_ProcessUploadedProfileImage();
+ 
+diff --git a/trunk/__swift/apps/base/config/language.xml b/trunk/__swift/apps/base/config/language.xml
+index 19daef7..2160a24 100644
+--- a/trunk/__swift/apps/base/config/language.xml
++++ b/trunk/__swift/apps/base/config/language.xml
+@@ -113,6 +113,7 @@
+ 	<phrase section="users" code="emailaccounts">Email Accounts</phrase>
+ 	<phrase section="users" code="praddemail">Add Email</phrase>
+ 	<phrase section="users" code="prprofileimage">Profile Image:</phrase>
++	<phrase section="users" code="sendticketupdate">Send Ticket update to all the email addresses</phrase>
+ 	<phrase section="users" code="prphone">Phone Number:</phrase>
+ 	<phrase section="users" code="prfullname">Full Name:</phrase>
+ 	<phrase section="users" code="prorganization">Organization:</phrase>
+diff --git a/trunk/__swift/apps/base/config/templates.xml b/trunk/__swift/apps/base/config/templates.xml
+index 8583b5e..6bb0566 100644
+--- a/trunk/__swift/apps/base/config/templates.xml
++++ b/trunk/__swift/apps/base/config/templates.xml
+@@ -1636,6 +1636,10 @@ a img {
+ 					<td align="left" valign="middle" class="zebraodd"><{$_language[prprofileimage]}></td>
+ 					<td><input name="profileimage" type="file" size="20" class="swifttextlarge" /></td>
+ 				</tr>
++				<tr>
++                    <td align="left" valign="middle" class="zebraodd"><{$_language[sendticketupdate]}></td>
++                    <td><input name="sendemailtoall" type="radio" value = "1" <{if $_sendEmailToAll == 1}> checked <{/if}> /><{$_language[yes]}> <input name="sendemailtoall" type="radio" value = "0"  <{if $_sendEmailToAll == 0}> checked <{/if}> /><{$_language[no]}></td>
++				</tr>
+ 			</table>
+ 			<br />
+ 			<{$_extendedProfileHTML}>
+diff --git a/trunk/__swift/apps/base/staff/class.Controller_User.php b/trunk/__swift/apps/base/staff/class.Controller_User.php
+index 024f295..3ae665f 100755
+--- a/trunk/__swift/apps/base/staff/class.Controller_User.php
++++ b/trunk/__swift/apps/base/staff/class.Controller_User.php
+@@ -860,6 +860,15 @@ class Controller_User extends Controller_staff
+ 			}
+ 			$_SWIFT_UserObject = SWIFT_User::Create($_POST['usergroupid'], $this->_GetPOSTUserOrganizationID(), $_POST['salutation'], $_POST['fullname'], $_POST['userdesignation'], $_POST['phone'], $_POST['isenabled'], $_POST['userrole'], $this->_GetPOSTEmailContainer(), substr(BuildHash(), 0, 12), $_languageID, $_POST['timezonephp'], $_POST['enabledst'], $_POST['slaplanid'], GetCalendarDateline($_POST['slaexpirytimeline']), GetCalendarDateline($_POST['userexpirytimeline']), true, true);
+ 
++			/*
++			 * BUG FIX - Pankaj Garg
++			 *
++			 * SWIFT-1683, In case of multiple email addresses for user account, there should be an option under User account to be enabled for sending ticket updates to all the email addresses
++			 */
++			if (isset($_POST['sendemailtoall'])) {
++				SWIFT_UserSetting::Replace($_SWIFT_UserObject->GetID(), 'sendemailtoall', $_POST['sendemailtoall']);
++			}
++
+ 			SWIFT_StaffActivityLog::AddToLog(sprintf($this->Language->Get('activityinsertuser'), htmlspecialchars($_POST['fullname'])), SWIFT_StaffActivityLog::ACTION_INSERT, SWIFT_StaffActivityLog::SECTION_USERS, SWIFT_StaffActivityLog::INTERFACE_STAFF);
+ 
+ 			if (!$_SWIFT_UserObject instanceof SWIFT_User || !$_SWIFT_UserObject->GetIsClassLoaded())
+@@ -1063,6 +1072,15 @@ class Controller_User extends Controller_staff
+ 				return false;
+ 			}
+ 
++			/*
++			 * BUG FIX - Pankaj Garg
++			 *
++			 * SWIFT-1683, In case of multiple email addresses for user account, there should be an option under User account to be enabled for sending ticket updates to all the email addresses
++			 */
++			if (isset($_POST['sendemailtoall'])) {
++				SWIFT_UserSetting::Replace($_SWIFT_UserObject->GetID(), 'sendemailtoall', $_POST['sendemailtoall']);
++			}
++
+ 			// Update the Profile Image
+ 			$this->_ProcessUploadedProfileImage($_SWIFT_UserObject);
+ 
+diff --git a/trunk/__swift/apps/base/staff/class.View_User.php b/trunk/__swift/apps/base/staff/class.View_User.php
+index d75d62c..244650b 100755
+--- a/trunk/__swift/apps/base/staff/class.View_User.php
++++ b/trunk/__swift/apps/base/staff/class.View_User.php
+@@ -101,6 +101,7 @@ class View_User extends SWIFT_View
+ 		$_SWIFT_UserOrganizationObject = false;
+ 		$_profileImageBottom = '';
+ 		$_userID = 0;
++		$_sendEmailToAll = 0;
+ 
+ 		if ($_mode == SWIFT_UserInterface::MODE_EDIT)
+ 		{
+
+@@ -144,6 +145,16 @@ class View_User extends SWIFT_View
+ 			$_userSLAPlanID = intval($_SWIFT_UserObject->GetProperty('slaplanid'));
+ 			$_userSLAExpiry = intval($_SWIFT_UserObject->GetProperty('slaexpirytimeline'));
+ 
++			/*
++			 * BUG FIX - Pankaj Garg
++			 *
++			 * SWIFT-1683, In case of multiple email addresses for user account, there should be an option under User account to be enabled for sending ticket updates to all the email addresses
++			 */
++			$_userSettingContainer = SWIFT_UserSetting::RetrieveOnUser($_SWIFT_UserObject);
++			if (isset($_userSettingContainer['sendemailtoall'])) {
++				$_sendEmailToAll = $_userSettingContainer['sendemailtoall'];
++			}
++
+ 			$_userID = $_SWIFT_UserObject->GetUserID();
+ 
+ 			if (SWIFT_UserProfileImage::UserHasProfileImage($_SWIFT_UserObject->GetUserID()))
+@@ -249,6 +260,13 @@ class View_User extends SWIFT_View
+ 			$_GeneralTabObject->TextMultipleAutoComplete('tags', false, false, '/Base/Tags/QuickSearch', $_userTagContainer, 'icon_taginput.gif', 'gridrow1', true);
+ 		}
+ 
++		/*
++		 * BUG FIX - Pankaj Garg
++		 *
++		 * SWIFT-1683, In case of multiple email addresses for user account, there should be an option under User account to be enabled for sending ticket updates to all the email addresses
++		 */
++		$_GeneralTabObject->YesNo('sendemailtoall', $this->Language->Get('sendticketupdate'), $this->Language->Get('desc_sendticketupdate'), $_sendEmailToAll);
++
+ 		$this->Controller->CustomFieldRendererStaff->Render(SWIFT_CustomFieldRenderer::TYPE_STATIC, $_mode, array(SWIFT_CustomFieldGroup::GROUP_USER), $_GeneralTabObject, $_userID);
+ 
+ 		if ($_mode == SWIFT_UserInterface::MODE_INSERT)
+diff --git a/trunk/__swift/locale/en-us/staff_users.php b/trunk/__swift/locale/en-us/staff_users.php
+index 5d30552..b3b18c8 100644
+--- a/trunk/__swift/locale/en-us/staff_users.php
++++ b/trunk/__swift/locale/en-us/staff_users.php
+@@ -190,6 +190,8 @@ $__LANG = array (
+ 	'titlepwgenerated' => 'Password Generated & Emailed',
+ 	'msgpwgenerated' => SWIFT_PRODUCT . ' has generated a random password for "%s" user and dispatched it to all registered email addresses.',
+ 	'loginasuser' => 'Login as User',
++	'sendticketupdate' => 'Send Ticket update to all the email addresses',
++	'desc_sendticketupdate' => 'This option will only be used if multiple email addresses are added in User Email(s). If you select it to No, ' . SWIFT_PRODUCT . ' will send all the ticket updates to the user who created a ticket. This will include staff replies and autoresponder.',
+ 
+ 	/**
+ 	 * ---------------------------------------------
+

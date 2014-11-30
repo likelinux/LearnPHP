@@ -1,0 +1,8 @@
+#!/bin/bash
+file="name"
+#IFS=$':'
+
+for name in `cat $file`
+do 
+	echo "Your name may be $name"
+done

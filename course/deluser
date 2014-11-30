@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# This script is used to delete the user from the system 
+
+read -p "Please enter the name of the user you want to delete from this system: " user
+
+
+if [ -z "$user" ]
+       then
+	echo "Please enter the valid username"
+elif [ -d   /home/$user ] 
+       then
+	userdel -r $user
+	echo "$user has been deleted from this system along with home directory"
+#elif [ -d ! `grep $user /home/` ]
+#	then
+ else  	
+	echo "$user does not exist on this system"
+fi	

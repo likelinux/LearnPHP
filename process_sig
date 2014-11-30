@@ -1,0 +1,12 @@
+process_sig()
+{
+	echo
+	date
+	cal
+}
+trap process_sig 10
+
+while :
+do
+	sleep 1
+done

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ -f .tmp ]
+then
+     echo "File does exist, nothing to do"
+else  `touch /home/scripts/.tmp`
+      echo "Files does not exit, so creating file"
+fi
+
+ 

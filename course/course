@@ -1,0 +1,198 @@
+#!/bin/bash
+fname=names.dat
+
+tmpfile=/tmp`basename $0`.$$
+
+pause()
+{
+	echo -e "Hit <ENTER> to continue: \c "
+	read junk 
+}
+
+yesno()
+{
+	read $yn junk
+	
+	case $yn in
+		y|Y|yes|Yes|YES)
+			return 0;;
+		n|N|no|No|NO)
+			return 1;;
+		*)
+			echo -e Please answer Yes or No. ;;
+	esac
+   #done
+}
+
+usage()
+{
+
+	script=$1
+	shift
+
+	echo "Usage: `basename $script` $*" 1>&2
+	exit 2
+}
+
+quit()
+{
+	code=$1
+
+	if yesno "Do you really wish to exit"
+	then
+		exit $code
+	fi
+}
+
+heading()
+{
+	echo "First Name	Surname		Address 	Phone Number	Pin Code"
+	echo "==========================================================================="
+}
+
+print_records()
+{
+	sort -t : | while read aline
+	do
+	echo $aline | awk -F : '{printf("%-14.14s%-16.16s%-20.20s%-15.15s%-10.10s\n", $1, $2, $3, $4, $5)}'
+	done
+}
+
+do_create()
+{ 
+	while :
+	do 
+		while :
+		do
+			clear
+			echo -e "Please enter the following contact details:"
+			echo
+			echo -e "Given name:  "
+			read name
+			echo
+			echo -e "Surname: "
+			read surname
+			echo
+			echo -e "Address: "
+			read address
+			echo 
+			echo -e "Phone Number: "
+			read phone
+			echo
+			echo -e "Pin Nunber: "
+			read pin
+
+			clear	
+			echo "You entered the following contact details:"
+			echo "Given Name: $name"
+			echo "Surname: $surname"
+			echo "Address: $address"
+			echo "Phone Number: $phone"
+			echo "Pin Number: $pin"
+			echo
+			if yesno Are these details correct
+			then
+			echo $name:$surname:$addrss:$phone:$pin >> $fname
+			break
+			fi
+		done
+			yesno Create another record || break
+		done
+}
+
+do_view()
+{
+	clear
+	(
+		heading
+		cat $fname | print_records
+	) | more
+	echo
+	echo Thers are `cat $fname | wc -l` contacts in the database
+}
+
+do_search()
+{
+	echo "Please enter pattern to search for (ENTER fo all): "
+	read string
+	
+	echo
+		if grep "$string" $fname > /dev/null
+		then
+			(
+				heading
+				grep "$string" $fname | print_records
+			) | more
+			return 0
+		else
+			echo -e " Sorry, no records in file \"$fname\" contains \"$string\""
+			return 1
+		fi
+}
+
+do_delete()
+{		do_search && yesno "\niDelete All these records" || retrn
+		if [ "$string" = "" ]
+		then
+			> $fname
+		echo "All records deleted from the file \"$fname\""
+		else
+		sed "/$string/d" $fname >> $tmpfile
+		mv $tmpfile $fname
+		echo "All records containing text \"$string\" deleted from file \"$fname\""
+		fi
+}
+
+trap "quit 3" 2 3
+trap "exit 0" 1 15
+
+[ $# == 1 ]  || usage $0 filename
+
+fname=$1
+
+if  [ ! -f $fname ]
+then
+
+	echo $1 does not exist
+
+	if yesno "create it"
+	then
+	> $fname
+		if [ ! -v $fname ]
+			then
+				echo $1 could not be created
+				exit 2
+			fi
+			else
+				exit 0
+	fi
+	elif [ ! -w $fname ] 
+	then
+		echo Could not open $1 for writing
+		exit 2
+fi
+
+while true
+do
+ clear
+	echo -e "\n\t\tSHELL PROGRAMMING DATABASE"
+	echo -e "\t\t\tMAIN MENU"
+	echo -e "\nWhat do you wish to do?\n"
+	echo -e "\t1. Create records"
+	echo -e "\t2. View records"
+	echo -e "\t3. Search for records"
+	echo -e "\t4. Delete records that match a pattern"
+echo
+		
+echo "Answer ( or q to quit ) ? "
+read ans junk
+
+case $ans in
+	1) do_create;;
+	2) do_view;;
+	3) do_serach;;
+	4) do_delete;;
+	q*|Q*) quit 0;;
+	*)  echo -e "Please entee a number between 1 and 4";;
+	esac
+done

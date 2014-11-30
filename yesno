@@ -1,0 +1,17 @@
+yesno()
+{
+while true 
+do
+	echo -e "$* (Y/N)? \c"
+	
+read yn junk
+	case $yn in
+	y|Y|yes|Yes|YES)
+ 		return 0;;
+	n|N|no|No|NO)
+		return 1;;
+	*)
+	echo Please anser Yes or No. ;;
+	esac
+done
+}

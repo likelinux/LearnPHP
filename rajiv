@@ -1,0 +1,70 @@
+#! /bin/bash
+# .subject and .idfile are queue for subject and ids.
+# .count file used for difference in 1 minute.
+location=`pwd`
+if [[ ! -f $location/.count  ]]; then
+
+sed -n '/To:/,/Content-Type/p' $MAIL | grep -i "message-id" | wc -l > $location/.count
+#newcount=`grep -i "subject" /var/spool/mail/root | wc -l`
+#count=`cat .count`
+fi
+
+if [[ ! -f $location/.tmp  ]]; then
+touch $location/.tmp
+fi
+
+# difference
+count=`cat .count`
+newcount=`grep -i "message-id" $MAIL | wc -l`
+lastid=`cat .tmp | cut -d ',' -f1`
+
+if [ "$newcount" != "$count" ];
+then
+number=`expr $newcount - $count`
+sed -n '/To:/,/Content-Type/p' $MAIL | grep -i "subject" | tail -$number | sed 's/^Subject: \(.*\)/\1/' > .subjectfile
+sed -n '/To:/,/Content-Type/p' $MAIL | grep -i "message-id" | tail -$number | cut -d ' ' -f 2 | sed 's/^<\(.*\)/\1/' | sed 's/.$// ' > .idfile
+
+	N=0
+cat .subjectfile | while read SUBJECT ; 
+do
+        N=$((N+1))
+#       echo "Line $N = $SUBJECT"
+messageid=`sed -n ''$N'p' .idfile`
+echo "$messageid"
+
+## generated subject and messageId
+
+if [ "$messageid" != "$lastid" ];
+   then
+
+for i in $(cat services.txt)
+do
+if [[ $i == $SUBJECT ]]; then
+
+/etc/init.d/$i restart 2>> logfile
+status=$?
+   if [ $status -eq 0 ];
+   then
+         echo $messageid > .tmp
+         echo $newcount > .count
+   else 
+echo "There is some problem, service not restarted at `date`" >> logfile
+   fi
+fi
+done
+
+#     if [[ "$SUBJECT" == "httpd-restart" ]] || [[ "$SUBJECT" == "httpd_restart" ]];
+ #     then
+  #       /etc/init.d/httpd restart
+   #      echo "service checked"
+    #     echo $messageid > .tmp
+     #    echo $newcount > .count
+	 #echo "not same"
+    # fi
+fi
+done
+else
+echo "up-to-date"
+
+fi
+
